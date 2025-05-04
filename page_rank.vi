@@ -1,5 +1,5 @@
 
-use std::data::Array;
+use std::{data::Array, rng::Pcg32};
 
 struct Node {
   incoming_edges: Array[F32],
@@ -21,24 +21,22 @@ pub mod Node {
     num_nodes: N32,
     damping: F32,
   ) {
+    let (incoming_edges, outgoing_edges) = *&(incoming_edges, outgoing_edges);
     // Send current page rank value to all neighbors
     let s = 0;
     let num_outgoing_edges = outgoing_edges.len();
-    outgoing_edges.for_each[~F32, N32](
-      &s,
-      fn(_: &N32, ~outgoing_edge: ~F32) {
-        outgoing_edge = damping * page_rank / num_outgoing_edges as F32;
-      },
-    );
+    outgoing_edges.for_each_independent(fn(~outgoing_edge: ~F32) {
+      outgoing_edge = damping * page_rank / num_outgoing_edges as F32;
+    });
     // Update page rank based on incoming values
     let new_pr = (1.0 - damping) / num_nodes as F32;
-    new_pr = incoming_edges.fold_front(new_pr, F32::add::add);
+    new_pr = new_pr + incoming_edges.fold_unordered(0.0, F32::add::add);
     page_rank = new_pr;
   }
 
   pub fn connect(&node1: &Node, &node2: &Node) {
     let incoming: F32;
-    let outgoing: ~F32 = ~incoming;
+    let outgoing: ~F32 = move ~incoming;
     node1.outgoing_edges.push_back(outgoing);
     node2.incoming_edges.push_back(incoming);
   }
@@ -48,39 +46,57 @@ pub mod Node {
   }
 }
 
+struct Graph(List[Node]);
+
+mod Graph {
+  pub fn new(num_nodes: N32) -> Graph {
+    Graph(List::new(num_nodes, Node::new(num_nodes)))
+  }
+
+  pub fn .connect(&Graph(nodes), a: N32, b: N32) {
+    if a != b {
+      Node::connect(nodes.get(a), nodes.get(b))
+    }
+  }
+
+  pub fn .process(&Graph(nodes), damping: F32) {
+    let len = nodes.len();
+    let iter = nodes.iter();
+    while iter.next() is Some(&node) {
+      node.process(len, damping);
+    }
+  }
+
+  pub fn .print(&Graph(nodes), &io: &IO) {
+    let i = 0;
+    let iter = nodes.iter();
+    while iter.next() is Some(&node) {
+      i += 1;
+      io.println("Node {i}: {node.page_rank}");
+    }
+  }
+}
+
 pub fn main(&io: &IO) {
-  let num_nodes = 4;
-  let a = Node::new(num_nodes);
-  let b = Node::new(num_nodes);
-  let c = Node::new(num_nodes);
-  let d = Node::new(num_nodes);
+  let num_nodes = 200;
+  let num_edges = 4000;
+  let iterations = 1000;
+  let graph = Graph::new(num_nodes);
 
-  Node::connect(&a, &b);
-  Node::connect(&a, &c);
-  Node::connect(&b, &a);
-  Node::connect(&b, &c);
-  Node::connect(&b, &d);
-  Node::connect(&c, &a);
-  Node::connect(&d, &c);
+  let rng = Pcg32::seeded("hello world");
+  let i = 0;
 
-  let damping = 0.85;
+  while i < num_edges {
+    graph.connect(rng.gen_n32() % num_nodes, rng.gen_n32() % num_nodes);
+    i += 1;
+  }
+
   let n = 0;
-  while n < 2 {
-    io.println("Node A: {a.get_page_rank()}");
-    io.println("Node B: {b.get_page_rank()}");
-    io.println("Node C: {c.get_page_rank()}");
-    io.println("Node D: {d.get_page_rank()}");
-    io.println("");
-    a.process(num_nodes, damping);
-    b.process(num_nodes, damping);
-    c.process(num_nodes, damping);
-    d.process(num_nodes, damping);
+  let damping = 0.85;
+  while n < iterations {
+    graph.process(damping);
     n += 1;
   }
 
-  io.println("Node A: {a.page_rank}");
-  io.println("Node B: {b.page_rank}");
-  io.println("Node C: {c.page_rank}");
-  io.println("Node D: {d.page_rank}");
-  io.println("");
+  graph.print(&io);
 }
