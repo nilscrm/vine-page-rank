@@ -1,48 +1,93 @@
 
-use std::{data::Array, rng::Pcg32};
+use #root::data::Array;
+use #root::debug::Show;
+use #root::rng::Pcg32;
+use #root::ops::arithmetic::Add;
 
-struct Node {
-  incoming_edges: Array[F32],
-  outgoing_edges: Array[~F32],
-  page_rank: F32,
+pub struct Stream[T]((T, Stream[T]));
+
+pub struct Send[T](~T);
+pub mod Send {
+  pub fn .send[T](Send[T](~send), data: T) {
+    send = data;
+  }
+
+  pub fn .send_stream[T](&Send[Stream[T]](~send), data: T) {
+    send = Stream(data, send);
+  }
+
+  pub fn .close_stream[T](Send[Stream[T]](send)) {
+    unsafe::erase(send);
+  }
 }
 
+pub struct Recv[T](T);
+pub mod Recv {
+  pub fn .recv[T](Recv[T](recv)) -> T {
+    recv
+  }
+
+  pub fn .recv_stream[T](&Recv[Stream[T]](recv)) -> T {
+    let data;
+    Stream(data, recv) = recv;
+    data
+  }
+
+  pub fn .close_stream[T](Recv[Stream[T]](recv)) {
+    unsafe::erase(recv);
+  }
+
+  pub impl drop[T?]: Drop[Recv[T]];
+}
+
+pub struct Node(pub {
+  page_rank: F32,
+  in_edges: Array[Recv[Stream[F32]]],
+  out_edges: Array[Send[Stream[F32]]],
+});
+
 pub mod Node {
-  pub fn new(total_num_nodes: N32) -> Node {
-    Node({
-      incoming_edges: Array::empty,
-      outgoing_edges: Array::empty,
-      page_rank: 1.0 / total_num_nodes as F32,
-    })
+  pub fn new(initial_page_rank: F32) -> Node {
+    Node({ page_rank: initial_page_rank, in_edges: Array::empty, out_edges: Array::empty })
+  }
+
+  pub fn .link_to(
+    &Node({ page_rank: _, in_edges: _, out_edges }),
+    &Node({ page_rank: _, in_edges, out_edges: _ }),
+  ) {
+    let stream;
+    out_edges.push_back(Send(~stream));
+    in_edges.push_back(Recv(stream));
   }
 
   pub fn .process(
-    &Node({ incoming_edges, outgoing_edges, page_rank }),
+    &Node({ page_rank, in_edges, out_edges }),
+    steps: N32,
     num_nodes: N32,
     damping: F32,
   ) {
-    let (incoming_edges, outgoing_edges) = *&(incoming_edges, outgoing_edges);
-    // Send current page rank value to all neighbors
-    let s = 0;
-    let num_outgoing_edges = outgoing_edges.len();
-    outgoing_edges.for_each_independent(fn(~outgoing_edge: ~F32) {
-      outgoing_edge = damping * page_rank / num_outgoing_edges as F32;
-    });
-    // Update page rank based on incoming values
-    let new_pr = (1.0 - damping) / num_nodes as F32;
-    new_pr = new_pr + incoming_edges.fold_unordered(0.0, F32::add::add);
-    page_rank = new_pr;
+    let num_outgoing_edges = out_edges.len();
+    for _ in 0..steps {
+      // Send current page rank value to all neighbors
+      out_edges = out_edges.map_unordered(fn* (edge: Send[Stream[F32]]) {
+        edge.send_stream(damping * page_rank / num_outgoing_edges as F32);
+        edge
+      });
+      let page_rank_in;
+      (page_rank_in, in_edges) = in_edges.unzip_with(fn* (edge: Recv[Stream[F32]]) {
+        let page_rank_in = edge.recv_stream();
+        (page_rank_in, edge)
+      });
+      page_rank = (1.0 - damping) / num_nodes as F32 + page_rank_in.reduce_unordered(Add::add).or_use(
+        0.0,
+      );
+    }
   }
 
-  pub fn connect(&node1: &Node, &node2: &Node) {
-    let incoming: F32;
-    let outgoing: ~F32 = move ~incoming;
-    node1.outgoing_edges.push_back(outgoing);
-    node2.incoming_edges.push_back(incoming);
-  }
-
-  pub fn .get_page_rank(&Node({ incoming_edges, outgoing_edges, page_rank })) -> F32 {
-    page_rank
+  pub impl show: Show[Node] {
+    fn show(&Node({ page_rank, in_edges: _, out_edges: _ })) -> Show {
+      Show::Constructor("Node", page_rank.show())
+    }
   }
 }
 
@@ -50,29 +95,32 @@ struct Graph(List[Node]);
 
 mod Graph {
   pub fn new(num_nodes: N32) -> Graph {
-    Graph(List::new(num_nodes, Node::new(num_nodes)))
+    let initial_page_rank = 1.0 / num_nodes as F32;
+    let nodes = [];
+    for _ in 0..num_nodes {
+      nodes.push_back(Node::new(initial_page_rank));
+    }
+    Graph(nodes)
   }
 
   pub fn .connect(&Graph(nodes), a: N32, b: N32) {
     if a != b {
-      Node::connect(nodes.get(a), nodes.get(b))
+      nodes.at(a).assume().*.link_to(nodes.at(b).assume());
     }
   }
 
-  pub fn .process(&Graph(nodes), damping: F32) {
+  pub fn .process(&Graph(nodes), steps: N32, damping: F32) {
     let len = nodes.len();
-    let iter = nodes.iter();
-    while iter.next() is Some(&node) {
-      node.process(len, damping);
+    for &node in &nodes {
+      node.process(steps, len, damping);
     }
   }
 
-  pub fn .print(&Graph(nodes), &io: &IO) {
-    let i = 0;
-    let iter = nodes.iter();
-    while iter.next() is Some(&node) {
-      i += 1;
-      io.println("Node {i}: {node.page_rank}");
+  pub impl show: Show[Graph];
+
+  pub impl drop: Drop[Graph] {
+    fn drop(Graph(nodes)) {
+      unsafe::erase(nodes);
     }
   }
 }
@@ -91,12 +139,8 @@ pub fn main(&io: &IO) {
     i += 1;
   }
 
-  let n = 0;
   let damping = 0.85;
-  while n < iterations {
-    graph.process(damping);
-    n += 1;
-  }
+  graph.process(iterations, damping);
 
-  graph.print(&io);
+  io.println("{graph.show()}");
 }
