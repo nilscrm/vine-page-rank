@@ -1,0 +1,42 @@
+name: Checks
+
+on: pull_request
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Get latest Vine commit SHA
+        id: vine-sha
+        run: |
+          echo "sha=$(git ls-remote https://github.com/VineLang/vine main | cut -f1)" >> $GITHUB_OUTPUT
+      - name: Cache vine-cli
+        id: vine-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            ~/.cargo/git/checkouts/
+          key: vine-cli-${{ steps.vine-sha.outputs.sha }}
+      - name: Install vine-cli if not cached
+        if: steps.vine-cache.outputs.cache-hit != 'true'
+        run: cargo install vine-cli --git https://github.com/VineLang/vine --rev ${{ steps.vine-sha.outputs.sha }}
+
+      - name: Format
+        - run: cargo fmt --check
+        - uses: dprint/check@v2.2
+
+      - name: clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Run page rank
+        run: vine run page_rank.vi
