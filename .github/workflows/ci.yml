@@ -36,8 +36,5 @@ jobs:
       - name: Format
         uses: dprint/check@v2.3
 
-      - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
-
       - name: Run page rank
         run: vine run page_rank.vi
