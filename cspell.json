@@ -1,0 +1,21 @@
+{
+    "version": "0.2",
+    "ignorePaths": [],
+    "dictionaryDefinitions": [],
+    "dictionaries": [],
+    "words": [
+        "fileset",
+        "INSTA",
+        "nixbuild",
+        "nixfmt",
+        "nixos",
+        "nixpkgs",
+        "numtide",
+        "pkgs",
+        "pname",
+        "rustc",
+        "stdenv"
+    ],
+    "ignoreWords": [],
+    "import": []
+}
