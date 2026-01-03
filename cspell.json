@@ -6,6 +6,7 @@
     "words": [
         "fileset",
         "INSTA",
+        "nixbuild",
         "nixfmt",
         "nixos",
         "nixpkgs",
