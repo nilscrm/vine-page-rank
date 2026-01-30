@@ -5,7 +5,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     vine = {
-      url = "github:VineLang/vine";
+      url = "github:VineLang/vine/dev";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
