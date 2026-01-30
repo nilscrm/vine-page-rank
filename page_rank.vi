@@ -3,6 +3,7 @@ use #root::data::Array;
 use #root::debug::Show;
 use #root::rng::Pcg32;
 use #root::ops::arithmetic::Add;
+use #root::util::erase;
 
 pub struct Stream[T]((T, Stream[T]));
 
@@ -17,7 +18,7 @@ pub mod Send {
   }
 
   pub fn .close_stream[T](Send[Stream[T]](send)) {
-    unsafe::erase(send);
+    safe erase(send);
   }
 }
 
@@ -34,7 +35,7 @@ pub mod Recv {
   }
 
   pub fn .close_stream[T](Recv[Stream[T]](recv)) {
-    unsafe::erase(recv);
+    safe erase(recv);
   }
 
   pub impl drop[T?]: Drop[Recv[T]];
@@ -117,12 +118,7 @@ mod Graph {
   }
 
   pub impl show: Show[Graph];
-
-  pub impl drop: Drop[Graph] {
-    fn drop(Graph(nodes)) {
-      unsafe::erase(nodes);
-    }
-  }
+  pub impl drop: Drop[Graph] = safe erase;
 }
 
 pub fn main(&io: &IO) {
