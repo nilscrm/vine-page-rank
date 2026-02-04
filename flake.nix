@@ -2,12 +2,9 @@
   description = "Vine Page Rank";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.follows = "vine/nixpkgs";
     flake-utils.url = "github:numtide/flake-utils";
-    vine = {
-      url = "github:VineLang/vine/dev";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    vine.url = "github:VineLang/vine/dev";
   };
 
   outputs =
@@ -34,7 +31,7 @@
             }
             ''
               export HOME=$TMPDIR
-              vine run --no-stats ${./page_rank.vi}
+              vine run --no-stats page_rank=${./page_rank.vi}
               mkdir -p $out
             '';
 
