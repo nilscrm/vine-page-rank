@@ -5,7 +5,7 @@ use #root::rng::Pcg32;
 use #root::ops::arithmetic::Add;
 use #root::util::erase;
 
-pub struct Stream[T]((T, Stream[T]));
+pub struct Stream[T](T, Stream[T]);
 
 pub struct Send[T](~T);
 pub mod Send {
@@ -79,9 +79,9 @@ pub mod Node {
         let page_rank_in = edge.recv_stream();
         (page_rank_in, edge)
       });
-      page_rank = (1.0 - damping) / num_nodes as F32 + page_rank_in.reduce_unordered(Add::add).or_use(
-        0.0,
-      );
+      page_rank = (1.0 - damping) / num_nodes as F32
+        + page_rank_in.reduce_unordered(Add::add).or_use(0.0)
+      ;
     }
   }
 
@@ -124,7 +124,7 @@ mod Graph {
 pub fn main(&io: &IO) {
   let num_nodes = 200;
   let num_edges = 4000;
-  let iterations = 1000;
+  let iterations = 100;
   let graph = Graph::new(num_nodes);
 
   let rng = Pcg32::seeded("hello world");
